@@ -59,122 +59,16 @@ app.get('/dashboard',(req,res)=>{
 // END OF CUSTOM MIDDLEWARE
 // ROOT PAGE
 app.get('/', ifNotLoggedin, (req,res,next) => {
-    dbConnection.execute("SELECT `name` FROM `users` WHERE `id`=?",[req.session.userID])
-    .then(([rows]) => {
-        res.render('home',{
-            name:rows[0].name
-        });
-    });
+    
+        res.render('main');
+
     
 });// END OF ROOT PAGE
 
 
-// REGISTER PAGE
-app.post('/register', ifLoggedin, 
-// post data validation(using express-validator)
-[
-    body('user_email','Invalid email address!').isEmail().custom((value) => {
-        return dbConnection.execute('SELECT `email` FROM `users` WHERE `email`=?', [value])
-        .then(([rows]) => {
-            if(rows.length > 0){
-                return Promise.reject('This E-mail already in use!');
-            }
-            return true;
-        });
-    }),
-    body('user_name','Username is Empty!').trim().not().isEmpty(),
-    body('user_pass','The password must be of minimum length 6 characters').trim().isLength({ min: 6 }),
-],// end of post data validation
-(req,res,next) => {
-
-    const validation_result = validationResult(req);
-    const {user_name, user_pass, user_email} = req.body;
-    // IF validation_result HAS NO ERROR
-    if(validation_result.isEmpty()){
-        // password encryption (using bcryptjs)
-        bcrypt.hash(user_pass, 12).then((hash_pass) => {
-            // INSERTING USER INTO DATABASE
-            dbConnection.execute("INSERT INTO `users`(`name`,`email`,`password`) VALUES(?,?,?)",[user_name,user_email, hash_pass])
-            .then(result => {
-                res.send(`your account has been created successfully, Now you can <a href="/">Login</a>`);
-            }).catch(err => {
-                // THROW INSERTING USER ERROR'S
-                if (err) throw err;
-            });
-        })
-        .catch(err => {
-            // THROW HASING ERROR'S
-            if (err) throw err;
-        })
-    }
-    else{
-        // COLLECT ALL THE VALIDATION ERRORS
-        let allErrors = validation_result.errors.map((error) => {
-            return error.msg;
-        });
-        // REDERING main PAGE WITH VALIDATION ERRORS
-        res.render('main',{
-            register_error:allErrors,
-            old_data:req.body
-        });
-    }
-});// END OF REGISTER PAGE
 
 
-// LOGIN PAGE
-app.post('/', ifLoggedin, [
-    body('user_email').custom((value) => {
-        return dbConnection.execute('SELECT email FROM users WHERE email=?', [value])
-        .then(([rows]) => {
-            if(rows.length == 1){
-                return true;
-                
-            }
-            return Promise.reject('Invalid Email Address!');
-            
-        });
-    }),
-    body('user_pass','Password is empty!').trim().not().isEmpty(),
-], (req, res) => {
-    const validation_result = validationResult(req);
-    const {user_pass, user_email} = req.body;
-    if(validation_result.isEmpty()){
-        
-        dbConnection.execute("SELECT * FROM `users` WHERE `email`=?",[user_email])
-        .then(([rows]) => {
-            bcrypt.compare(user_pass, rows[0].password).then(compare_result => {
-                if(compare_result === true){
-                    req.session.isLoggedIn = true;
-                    req.session.userID = rows[0].id;
 
-                    res.redirect('/');
-                }
-                else{
-                    res.render('main',{
-                        login_errors:['Invalid Password!']
-                    });
-                }
-            })
-            .catch(err => {
-                if (err) throw err;
-            });
-
-
-        }).catch(err => {
-            if (err) throw err;
-        });
-    }
-    else{
-        let allErrors = validation_result.errors.map((error) => {
-            return error.msg;
-        });
-        // REDERING main PAGE WITH LOGIN VALIDATION ERRORS
-        res.render('main',{
-            login_errors:allErrors
-        });
-    }
-});
-// END OF LOGIN PAGE
 
 // LOGOUT
 app.get('/logout',(req,res)=>{
@@ -190,14 +84,27 @@ app.get('/about',(req,res)=>{
     res.render('about');
 });
 
-app.post('/signup',(req,res)=>{
+app.post('/signup',[
+    body('email','Invalid email address!').isEmail().custom((value) => {
+        return dbConnection.execute('SELECT `username` FROM `users` WHERE `username`=?', [value])
+        .then(([rows]) => {
+            if(rows.length > 0){
+                return Promise.reject('This E-mail already in use!');
+            }
+            return true;
+        });
+    }),
+    body('password1','The password must be of minimum length 6 characters').trim().isLength({ min: 6 }),
+],(req,res)=>{
     //session destroy
     console.log(req.body.password1);
     let user = {
         "username": req.body.email,
         "password": req.body.password1
 }
-
+const validation_result = validationResult(req);
+    const {user_pass, user_email} = req.body;
+    if(validation_result.isEmpty()){
     // req.session = null;
     bcrypt.hash(req.body.password1, 12).then((hash_pass) => {
         console.log(hash_pass);
@@ -216,13 +123,25 @@ app.post('/signup',(req,res)=>{
         console.log(err);
         if (err)   res.render('signup');;
     })
+}else{
+    let allErrors = validation_result.errors.map((error) => {
+        return error.msg;
+    });
+    // REDERING main PAGE WITH LOGIN VALIDATION ERRORS
+    console.log("allErrors:",allErrors);
+    res.render('signup',{
+        login_errors:allErrors
+    });
+}
     // res.render('signup');
 });
 
 app.get('/signup',(req,res)=>{
     //session destroy
     req.session = null;
-    res.render('signup');
+    res.render('signup',{
+        login_errors:[]
+    });
 });
 
 app.get('/backend',(req,res)=>{

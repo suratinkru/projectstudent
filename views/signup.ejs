@@ -113,6 +113,9 @@
                        <div class="signup-form">
                         <h2 class="form-title"><br>
                          Sign up</h2>
+                         <%  if (login_errors.length > 0) { %>
+                            <h2><%= login_errors[0] %></h2>
+                        <% } %>
                         <form action="/signup" method="post" novaildate onSubmit = "return checkPassword(this)">
                           <div class="form-group">
                                 <label for="email"><i class="zmdi zmdi-email"></i></label>
